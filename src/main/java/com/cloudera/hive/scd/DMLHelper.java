@@ -21,8 +21,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 public interface DMLHelper<K, V> {
-  boolean initialize(Connection conn) throws SQLException;
-  String insertValues(K key, V value) throws SQLException;
+  void initialize(Connection conn) throws SQLException;
+  void insertValues(K key, V value) throws SQLException;
   boolean retrieveResults(K key, V value) throws SQLException;
   void close() throws SQLException;
 }

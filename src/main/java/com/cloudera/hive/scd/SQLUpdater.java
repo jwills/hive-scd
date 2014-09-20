@@ -5,9 +5,9 @@ import com.google.common.io.CharStreams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.mapred.FileSplit;
+import org.apache.hadoop.mapred.InputSplit;
+import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -33,7 +33,7 @@ public abstract class SQLUpdater<K, V> {
     }
   }
 
-  public void initialize(InputSplit split, TaskAttemptContext ctxt) throws IOException {
+  public void initialize(InputSplit split, JobConf jc) throws IOException {
     if (conn != null) {
       return;
     }
@@ -42,7 +42,7 @@ public abstract class SQLUpdater<K, V> {
     } catch (SQLException e) {
       throw new RuntimeException("Derby not found", e);
     }
-    List<String> updateStmts = loadUpdateStatements(split, ctxt);
+    List<String> updateStmts = loadUpdateStatements(split, jc);
     boolean valid = true;
     for (String sql : updateStmts) {
       String[] pieces = sql.toUpperCase(Locale.ENGLISH).split("\\s+");
@@ -60,7 +60,7 @@ public abstract class SQLUpdater<K, V> {
         throw new IllegalStateException("Multiple table names in DDL: " + tableName + " and " + table);
       }
     }
-    this.helper = createDMLHelper(tableName, ctxt.getConfiguration());
+    this.helper = createDMLHelper(tableName, split, jc);
     this.updateStmts = Lists.newArrayList();
 
     try {
@@ -73,13 +73,13 @@ public abstract class SQLUpdater<K, V> {
     }
   }
 
-  protected abstract DMLHelper<K, V> createDMLHelper(String tableName, Configuration conf);
+  protected abstract DMLHelper<K, V> createDMLHelper(String tableName, InputSplit split, JobConf jc);
 
-  private List<String> loadUpdateStatements(InputSplit split, TaskAttemptContext ctxt) throws IOException {
+  private List<String> loadUpdateStatements(InputSplit split, JobConf jc) throws IOException {
     List<String> stmts = Lists.newArrayList();
     if (split instanceof FileSplit) {
       Path base = ((FileSplit) split).getPath();
-      FileSystem fs = base.getFileSystem(ctxt.getConfiguration());
+      FileSystem fs = base.getFileSystem(jc);
       Path updates = new Path(base.getParent(), ".updates");
       if (fs.exists(updates)) {
         stmts.addAll(readLines(fs, updates));

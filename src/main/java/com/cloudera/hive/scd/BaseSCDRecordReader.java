@@ -1,12 +1,10 @@
 package com.cloudera.hive.scd;
 
-import org.apache.hadoop.mapreduce.InputSplit;
-import org.apache.hadoop.mapreduce.RecordReader;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapred.RecordReader;
 
 import java.io.IOException;
 
-public class BaseSCDRecordReader<K, V> extends RecordReader<K, V> {
+public class BaseSCDRecordReader<K, V> implements RecordReader<K, V> {
 
   private final RecordReader<K, V> delegate;
   private final SQLUpdater<K, V> updater;
@@ -17,17 +15,11 @@ public class BaseSCDRecordReader<K, V> extends RecordReader<K, V> {
   }
 
   @Override
-  public void initialize(InputSplit split, TaskAttemptContext ctxt) throws IOException, InterruptedException {
-    delegate.initialize(split, ctxt);
-    updater.initialize(split, ctxt);
-  }
-
-  @Override
-  public boolean nextKeyValue() throws IOException, InterruptedException {
-    if (delegate.nextKeyValue()) {
-      boolean skip = updater.apply(delegate.getCurrentKey(), delegate.getCurrentValue());
-      while (skip && delegate.nextKeyValue()) {
-        skip = updater.apply(delegate.getCurrentKey(), delegate.getCurrentValue());
+  public boolean next(K k, V v) throws IOException {
+    if (delegate.next(k, v)) {
+      boolean skip = updater.apply(k, v);
+      while (skip && delegate.next(k, v)) {
+        skip = updater.apply(k, v);
       }
       return !skip;
     }
@@ -35,23 +27,28 @@ public class BaseSCDRecordReader<K, V> extends RecordReader<K, V> {
   }
 
   @Override
-  public K getCurrentKey() throws IOException, InterruptedException {
-    return delegate.getCurrentKey();
+  public K createKey() {
+    return delegate.createKey();
   }
 
   @Override
-  public V getCurrentValue() throws IOException, InterruptedException {
-    return delegate.getCurrentValue();
+  public V createValue() {
+    return delegate.createValue();
   }
 
   @Override
-  public float getProgress() throws IOException, InterruptedException {
-    return delegate.getProgress();
+  public long getPos() throws IOException {
+    return delegate.getPos();
   }
 
   @Override
   public void close() throws IOException {
     delegate.close();
     updater.close();
+  }
+
+  @Override
+  public float getProgress() throws IOException {
+    return delegate.getProgress();
   }
 }
