@@ -40,6 +40,13 @@
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>11.0.2</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>1.4.181</version>
     </dependency>
 
     <dependency>

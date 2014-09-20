@@ -17,6 +17,7 @@ public class BaseSCDRecordReader<K, V> implements RecordReader<K, V> {
   @Override
   public boolean next(K k, V v) throws IOException {
     if (delegate.next(k, v)) {
+      System.out.println("Applying update...");
       boolean skip = updater.apply(k, v);
       while (skip && delegate.next(k, v)) {
         skip = updater.apply(k, v);

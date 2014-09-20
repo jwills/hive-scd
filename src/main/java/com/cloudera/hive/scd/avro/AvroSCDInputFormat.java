@@ -22,6 +22,7 @@ import com.cloudera.hive.scd.DMLHelper;
 import com.cloudera.hive.scd.SQLUpdater;
 import com.google.common.collect.ImmutableMap;
 import org.apache.avro.Schema;
+import org.apache.avro.util.Utf8;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat;
@@ -134,6 +135,7 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
 
     @Override
     public void initialize(Connection conn) throws SQLException {
+      this.conn = conn;
       StringBuilder create = new StringBuilder("CREATE TABLE ").append(tableName).append(" (");
       StringBuilder insert = new StringBuilder("INSERT INTO ").append(tableName).append(" VALUES (");
       for (int i = 0; i < schema.getFields().size(); i++) {
@@ -142,11 +144,14 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
         insert.append("?,");
       }
       create.deleteCharAt(create.length() - 1).append(")");
-      insert.deleteCharAt(create.length() - 1).append(")");
+      insert.deleteCharAt(insert.length() - 1).append(")");
+
+      System.out.println("Create is: " + create.toString());
+      System.out.println("Insert is: " + insert.toString());
 
       conn.createStatement().execute(create.toString());
       insertStmt = conn.prepareStatement(insert.toString());
-      deleteStmt = conn.prepareStatement("delete from " + tableName);
+      deleteStmt = conn.prepareStatement("DELETE FROM " + tableName);
     }
 
     private static Map<Schema.Type, String> SQL_TYPES = ImmutableMap.<Schema.Type, String>builder()
@@ -176,11 +181,28 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
 
     @Override
     public void insertValues(NullWritable key, AvroGenericRecordWritable value) throws SQLException {
-      deleteStmt.execute();
+      boolean dret = deleteStmt.execute();
+      System.out.println("Delete executed with = " + dret);
       for (int i = 0; i < schema.getFields().size(); i++) {
-        insertStmt.setObject(i + 1, value.getRecord().get(i));
+        insertStmt.setObject(i + 1, convertIn(value.getRecord().get(i)));
       }
-      insertStmt.execute();
+      boolean ret = insertStmt.execute();
+      System.out.println("Insert executed w/return value = " + ret);
+      System.out.println("Inserting record: " + value.getRecord().toString());
+    }
+
+    private Object convertIn(Object v) {
+      if (v instanceof Utf8) {
+        return v.toString();
+      }
+      return v;
+    }
+
+    private Object convertOut(Object v) {
+      if (v instanceof String) {
+        return new Utf8((String) v);
+      }
+      return v;
     }
 
     @Override
@@ -190,11 +212,11 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
         ResultSet rs = stmt.executeQuery("select * from " + tableName);
         if (rs.next()) {
           for (int i = 0; i < schema.getFields().size(); i++) {
-            value.getRecord().put(i, rs.getObject(i + 1));
+            value.getRecord().put(i, convertOut(rs.getObject(i + 1)));
           }
-          return true;
-        } else {
           return false;
+        } else {
+          return true;
         }
       } finally {
         if (stmt != null) {

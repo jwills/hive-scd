@@ -26,24 +26,13 @@ public abstract class SQLUpdater<K, V> {
   private String tableName;
 
   public SQLUpdater() {
-    try {
-      Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
-    } catch (ClassNotFoundException e) {
-      throw new RuntimeException("Could not load embedded derby driver", e);
-    }
   }
 
   public void initialize(InputSplit split, JobConf jc) throws IOException {
     if (conn != null) {
       return;
     }
-    try {
-      this.conn = DriverManager.getConnection("jdbc:derby:scd;create=true");
-    } catch (SQLException e) {
-      throw new RuntimeException("Derby not found", e);
-    }
     List<String> updateStmts = loadUpdateStatements(split, jc);
-    boolean valid = true;
     for (String sql : updateStmts) {
       String[] pieces = sql.toUpperCase(Locale.ENGLISH).split("\\s+");
       String table = null;
@@ -60,16 +49,25 @@ public abstract class SQLUpdater<K, V> {
         throw new IllegalStateException("Multiple table names in DDL: " + tableName + " and " + table);
       }
     }
-    this.helper = createDMLHelper(tableName, split, jc);
-    this.updateStmts = Lists.newArrayList();
 
-    try {
-      this.helper.initialize(conn);
-      for (String sql : updateStmts) {
-        this.updateStmts.add(conn.prepareStatement(sql));
+    if (tableName != null) {
+      this.helper = createDMLHelper(tableName, split, jc);
+      this.updateStmts = Lists.newArrayList();
+
+      try {
+        this.conn = DriverManager.getConnection("jdbc:h2:mem:");
+      } catch (SQLException e) {
+        throw new RuntimeException("H2 database not found", e);
       }
-    } catch (SQLException e) {
-      throw new IOException("Could not execute DDL", e);
+
+      try {
+        this.helper.initialize(conn);
+        for (String sql : updateStmts) {
+          this.updateStmts.add(conn.prepareStatement(sql));
+        }
+      } catch (SQLException e) {
+        throw new IOException("Could not execute DDL", e);
+      }
     }
   }
 
@@ -98,6 +96,9 @@ public abstract class SQLUpdater<K, V> {
   }
 
   public boolean apply(K currentKey, V currentValue) {
+    if (tableName == null) {
+      return false;
+    }
     try {
       helper.insertValues(currentKey, currentValue);
       for (PreparedStatement ps : updateStmts) {
@@ -105,18 +106,24 @@ public abstract class SQLUpdater<K, V> {
       }
       return helper.retrieveResults(currentKey, currentValue);
     } catch (SQLException e) {
-      //TODO: log this
-      return false;
+      e.printStackTrace();
+      return true;
     }
   }
 
   public void close() {
     try {
-      helper.close();
-      for (PreparedStatement ps : updateStmts) {
-        ps.close();
+      if (helper != null) {
+        helper.close();
       }
-      conn.close();
+      if (updateStmts != null) {
+        for (PreparedStatement ps : updateStmts) {
+          ps.close();
+        }
+      }
+      if (conn != null) {
+        conn.close();
+      }
     } catch (SQLException e) {
       // NBD, but log these
     }
