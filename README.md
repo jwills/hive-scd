@@ -243,6 +243,14 @@ against previous versions of the table or to test new updates. You may also want
 periodically compact the updates into a new version of the dimension table when you don't
 expect to need to be able to roll any of the updates back.
 
+### Are there any limitations I should be aware of? ###
+
+Yes: right now, type support is pretty limited; we can handle flat Avro records
+(so no nested structure) composed of ints, longs, floats, doubles, booleans, and
+strings (which are mapped to VARCHAR(32767) values in H2). I hope that this isn't
+a major problem for most Avro-serialized dimension tables, although adding decimal
+support is probably worthwhile in the near future.
+
 ### Will any other file formats be supported in the future? ###
 
 Quite possibly; I chose Avro for the prototype because it was relatively easy to do
