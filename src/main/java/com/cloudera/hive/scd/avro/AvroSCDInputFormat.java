@@ -148,9 +148,6 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
       create.deleteCharAt(create.length() - 1).append(")");
       insert.deleteCharAt(insert.length() - 1).append(")");
 
-      System.out.println("Create is: " + create.toString());
-      System.out.println("Insert is: " + insert.toString());
-
       conn.createStatement().execute(create.toString());
       insertStmt = conn.prepareStatement(insert.toString());
       deleteStmt = conn.prepareStatement("DELETE FROM " + tableName);
@@ -183,14 +180,11 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
 
     @Override
     public void insertValues(NullWritable key, AvroGenericRecordWritable value) throws SQLException {
-      boolean dret = deleteStmt.execute();
-      System.out.println("Delete executed with = " + dret);
+      deleteStmt.execute();
       for (int i = 0; i < schema.getFields().size(); i++) {
         insertStmt.setObject(i + 1, convertIn(value.getRecord().get(i)));
       }
-      boolean ret = insertStmt.execute();
-      System.out.println("Insert executed w/return value = " + ret);
-      System.out.println("Inserting record: " + value.getRecord().toString());
+      insertStmt.execute();
     }
 
     private Object convertIn(Object v) {

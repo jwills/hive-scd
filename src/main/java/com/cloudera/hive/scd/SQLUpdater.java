@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
+import org.joda.time.format.ISODateTimeFormat;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -91,26 +92,46 @@ public abstract class SQLUpdater<K, V> {
 
   protected abstract DMLHelper<K, V> createDMLHelper(String tableName, InputSplit split, JobConf jc);
 
+  private long asSCDTime(String text, long defaultValue) {
+    if (text == null || text.isEmpty()) {
+      return defaultValue;
+    } else {
+      try {
+        return Long.valueOf(text);
+      } catch (NumberFormatException e) {
+        return ISODateTimeFormat.dateOptionalTimeParser().parseMillis(text);
+      }
+    }
+  }
+
   private List<String> loadUpdateStatements(InputSplit split, JobConf jc) throws IOException {
+    long currentSCDTime = asSCDTime(jc.get("scd.time", ""), System.currentTimeMillis());
     List<String> stmts = Lists.newArrayList();
     if (split instanceof FileSplit) {
       Path base = ((FileSplit) split).getPath();
       FileSystem fs = base.getFileSystem(jc);
       Path updates = new Path(base.getParent(), ".updates");
       if (fs.exists(updates)) {
-        stmts.addAll(readLines(fs, updates));
-      }
-      Path parentUpdates = new Path(base.getParent().getParent(), ".updates");
-      if (fs.exists(parentUpdates)) {
-        stmts.addAll(readLines(fs, parentUpdates));
+        stmts.addAll(readLines(fs, updates, currentSCDTime));
       }
     }
     //TODO: get updates from distributed cache
     return stmts;
   }
 
-  private List<String> readLines(FileSystem fs, Path path) throws IOException {
-    return CharStreams.readLines(new InputStreamReader(fs.open(path)));
+  private static final String TIME_PREFIX = "-- time=";
+
+  private List<String> readLines(FileSystem fs, Path path, long rootScdTime) throws IOException {
+    List<String> lines = Lists.newArrayList();
+    long currentScdTime = 0L;
+    for (String line : CharStreams.readLines(new InputStreamReader(fs.open(path)))) {
+      if (line.toLowerCase(Locale.ENGLISH).startsWith(TIME_PREFIX)) {
+        currentScdTime = asSCDTime(line.substring(TIME_PREFIX.length()), rootScdTime);
+      } else if (currentScdTime <= rootScdTime) {
+        lines.add(line);
+      }
+    }
+    return lines;
   }
 
   public boolean apply(K currentKey, V currentValue) {
