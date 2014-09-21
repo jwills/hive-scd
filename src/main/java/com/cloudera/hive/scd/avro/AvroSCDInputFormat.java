@@ -1,23 +1,20 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Copyright (c) 2014, Cloudera, Inc. All Rights Reserved.
+ *
+ * Cloudera, Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"). You may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for
+ * the specific language governing permissions and limitations under the
+ * License.
  */
 package com.cloudera.hive.scd.avro;
 
-import com.cloudera.hive.scd.BaseSCDRecordReader;
+import com.cloudera.hive.scd.SCDRecordReader;
 import com.cloudera.hive.scd.DMLHelper;
 import com.cloudera.hive.scd.SQLUpdater;
 import com.google.common.collect.ImmutableMap;
@@ -46,6 +43,11 @@ import java.sql.Statement;
 import java.util.Map;
 import java.util.Properties;
 
+/**
+ * A Hive-compatible Avro {@code InputFormat} that applies SQL updates/deletes to the Avro records
+ * as they are read based on DML contained inside of an ".updates" file stored in the same directory
+ * as the Avro records.
+ */
 public class AvroSCDInputFormat extends AvroContainerInputFormat {
   @Override
   public RecordReader<NullWritable, AvroGenericRecordWritable> getRecordReader(
@@ -53,7 +55,7 @@ public class AvroSCDInputFormat extends AvroContainerInputFormat {
     RecordReader<NullWritable, AvroGenericRecordWritable> parent = super.getRecordReader(split, jc, reporter);
     AvroSQLUpdater updater = new AvroSQLUpdater();
     updater.initialize(split, jc);
-    return new BaseSCDRecordReader<NullWritable, AvroGenericRecordWritable>(parent, updater);
+    return new SCDRecordReader<NullWritable, AvroGenericRecordWritable>(parent, updater);
   }
 
   static class AvroSQLUpdater extends SQLUpdater<NullWritable, AvroGenericRecordWritable> {

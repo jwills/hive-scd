@@ -1,8 +1,21 @@
+/*
+ * Copyright (c) 2014, Cloudera, Inc. All Rights Reserved.
+ *
+ * Cloudera, Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"). You may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * This software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for
+ * the specific language governing permissions and limitations under the
+ * License.
+ */
 package com.cloudera.hive.scd;
 
 import com.google.common.collect.Lists;
 import com.google.common.io.CharStreams;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileSplit;
@@ -18,6 +31,11 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Base class for performing DML updates on the content read in from a {@code }RecordReader} via the
+ * {@link com.cloudera.hive.scd.SCDRecordReader}. The updates should be contained in a file named
+ * ".updates" that is located in the same directory as the regular input files.
+ */
 public abstract class SQLUpdater<K, V> {
 
   private Connection conn;
