@@ -60,7 +60,7 @@ public abstract class SQLUpdater<K, V> {
       } else if ("DELETE".equals(pieces[0])) {
         table = pieces[2];
       } else {
-        throw new IllegalStateException("Unsupported SQL DML statement: " + sql);
+        throw new IllegalStateException("Unsupported DML: " + sql);
       }
       if (this.tableName == null) {
         this.tableName = table;
@@ -115,7 +115,6 @@ public abstract class SQLUpdater<K, V> {
         stmts.addAll(readLines(fs, updates, currentSCDTime));
       }
     }
-    //TODO: get updates from distributed cache
     return stmts;
   }
 
@@ -124,12 +123,37 @@ public abstract class SQLUpdater<K, V> {
   private List<String> readLines(FileSystem fs, Path path, long rootScdTime) throws IOException {
     List<String> lines = Lists.newArrayList();
     long currentScdTime = 0L;
+    StringBuilder workingLine = null;
     for (String line : CharStreams.readLines(new InputStreamReader(fs.open(path)))) {
       if (line.toLowerCase(Locale.ENGLISH).startsWith(TIME_PREFIX)) {
         currentScdTime = asSCDTime(line.substring(TIME_PREFIX.length()), rootScdTime);
       } else if (currentScdTime <= rootScdTime) {
-        lines.add(line);
+        // Prune out comments/whitspace
+        line = line.trim();
+        int commentIndex = line.indexOf("--");
+        if (commentIndex >= 0) {
+          line = line.substring(0, commentIndex);
+        }
+        if (!line.isEmpty()) {
+          if (!line.endsWith(";")) {
+            if (workingLine == null) {
+              workingLine = new StringBuilder();
+            }
+            workingLine.append(line).append(' ');
+          } else {
+            if (workingLine != null) {
+              workingLine.append(line);
+              lines.add(workingLine.toString());
+              workingLine = null; // working line is completed.
+            } else { // single-line statement
+              lines.add(line);
+            }
+          }
+        }
       }
+    }
+    if (workingLine != null) {
+      throw new IllegalStateException("Incomplete SQL in updates: " + workingLine.toString());
     }
     return lines;
   }
